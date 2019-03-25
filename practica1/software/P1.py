@@ -8,6 +8,8 @@ from scipy.io import arff #para leer los ficheros de datos
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
+np.random.seed = 42
+
 #Función que recibe los datos leídos de los ficheros y los divide en X e y,
 #   y normaliza los valores de X para que estén todos dentro del intervalo [0,1]
 def tratamientoDatos(datos):
@@ -35,8 +37,7 @@ def tratamientoDatos(datos):
     
     return X,y
 
-#Función que recibe X e y, los divide en 5 secciones y hace 5-fold cross 
-#   validation con ellos.
+#KNN con k=1 y pesos uniformes
 def KNN(X, y):
     #Crear la división en 5 secciones
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -112,7 +113,7 @@ def encontrarEnemigo(conjunto, i, valores):
     
     return conjunto[sol]
     
-
+#KNN con k=1 y pesos aprendidos usando el método greedy RELIEF
 def RELIEF(X,y):
     #Crear la división en 5 secciones
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -165,7 +166,98 @@ def RELIEF(X,y):
             if pruebay[k] == pred: num_aciertos += 1
         
         porcentajes.append(100 * num_aciertos / len(pruebax))
+    
+    return porcentajes
+
+#KNN con k=1 y pesos aprendidos usando el método de búsqueda local best first
+def BL(X,y):
+    #Inicializa el vector de pesos con valores aleatorios entre [0,1]
+    w = np.random.rand(len(X[0]))
+    
+    #Crear la división en 5 secciones
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    skf.get_n_splits(X,y)
+    
+    valor_max = -10000.0
+    
+    porcentajes = []
+    
+    #Iterar sobre las 5 secciones distintas
+    for i, j in skf.split(X,y):
+        num_aciertos = 0
+        
+        #Separar los datos de entrenamiento y prueba en listas distintas
+        entrenamientox = [X[k] for k in i]
+        entrenamientoy = [y[k] for k in i]
+        
+        pruebax = [X[k] for k in j]
+        pruebay = [y[k] for k in j]
+        
+        num_vecinos = 0
+        iteraciones = 0
+        
+        #Exploración del vecindario
+        while num_vecinos < 20 * len(w) and iteraciones < 15000:
+            #Generación de un valor de la distribución normal
+            Z = np.random.normal(0.0, 0.3, None)
+            w_original = w #se guarda el valor original del vector en caso de que tenga que volver atrás
             
+            for k in range(len(w)):
+                #Se modifica un valor del vector de pesos y se trunca -> nuevo vecino
+                w[k] += Z
+                if w[k] < 0.2: w[k] = 0.0
+                if w[k] > 1.0: w[k] = 1.0
+            
+                num_vecinos += 1
+                
+                #Se comprueba si el nuevo vecino es mejor que el que ya tenemos
+                entrenamientox_aux = entrenamientox * w
+                pruebax_aux = pruebax * w
+                
+                clasificador = KNeighborsClassifier(n_neighbors=1)
+                clasificador.fit(entrenamientox_aux, entrenamientoy)
+                
+                for k in range(len(pruebax)):
+                    pred = clasificador.predict([pruebax_aux[k]])
+                    if pruebay[k] == pred: num_aciertos += 1
+                
+                tasa_cas = 100 * num_aciertos / len(pruebax_aux)
+                
+                nulos = 0
+                for k in w:
+                    if k == 0.0: nulos += 1
+                    
+                tasa_red = 100 * nulos / len(w)
+                
+                #Evaluación de la función objetivo
+                valor = 0.5 * tasa_cas + 0.5 * tasa_red
+                
+                #Si el valor para la función objetivo es mejor que el que tenemos,
+                #   nos movemos a ese valor y ya no buscamos más vecinos
+                if valor > valor_max:
+                    valor_max = valor
+                    iteraciones = 0
+                    break
+                else: #Si el valor es peor, seguimos explorando el vecindario
+                    w = w_original
+                    iteraciones += 1
+        
+        #Multiplicar los inputs por los pesos obtenidos
+        entrenamientox *= w
+        pruebax *= w
+        
+        #Entrenar a un clasificador con los datos de entrenamiento, y obtener
+        #   las predicciones para los datos de prueba
+        clasificador = KNeighborsClassifier(n_neighbors=1)
+        clasificador.fit(entrenamientox, entrenamientoy)
+        
+        num_aciertos = 0
+        for k in range(len(pruebax)):
+            pred = clasificador.predict([pruebax[k]])
+            if pruebay[k] == pred: num_aciertos += 1
+        
+        porcentajes.append(100 * num_aciertos / len(pruebax))
+    
     return porcentajes
 
 #lectura de los ficheros de datos
@@ -181,6 +273,9 @@ print("Porcentaje 1NN: ", sum(porcentajes)/5.0)
 porcentajes = RELIEF(X,y)
 print("Porcentaje RELIEF: ", sum(porcentajes)/5.0)
 
+porcentajes = BL(X,y)
+print("Porcentaje Búsqueda Local: ", sum(porcentajes)/5.0)
+
 #ionosphere
 X, y = tratamientoDatos(datos2)
 porcentajes = KNN(X,y)
@@ -189,6 +284,9 @@ print("Porcentaje 1NN: ", sum(porcentajes)/5.0)
 porcentajes = RELIEF(X,y)
 print("Porcentaje RELIEF: ", sum(porcentajes)/5.0)
 
+porcentajes = BL(X,y)
+print("Porcentaje Búsqueda Local: ", sum(porcentajes)/5.0)
+
 #texture
 X, y = tratamientoDatos(datos3)
 porcentajes = KNN(X,y) 
@@ -196,6 +294,9 @@ print("Porcentaje 1NN: ", sum(porcentajes)/5.0)
 
 porcentajes = RELIEF(X,y)
 print("Porcentaje RELIEF: ", sum(porcentajes)/5.0)
+
+porcentajes = BL(X,y)
+print("Porcentaje Búsqueda Local: ", sum(porcentajes)/5.0)
 
 
 
