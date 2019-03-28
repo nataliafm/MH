@@ -4,9 +4,10 @@
 """
 
 from sklearn.neighbors import KNeighborsClassifier
-from scipy.io import arff #para leer los ficheros de datos
+from scipy.io import arff
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
+import time
 
 np.random.seed = 42
 
@@ -44,8 +45,10 @@ def KNN(X, y):
     skf.get_n_splits(X,y)
 
     porcentajes = []
+    tiempos = []
     #Iterar sobre las 5 secciones distintas
     for i, j in skf.split(X,y):
+        start = time.time()
         num_aciertos = 0
         
         #Separar los datos de entrenamiento y prueba en listas distintas
@@ -71,8 +74,12 @@ def KNN(X, y):
         #Guarda el porcentaje de aciertos sobre el número de valores de prueba
         porcentajes.append(100 * num_aciertos / len(pruebax))
         
-    #Devuelve los porcentajes obtenidos en los 5 cálculos
-    return porcentajes
+        #Calcula el tiempo de ejecución de esa iteración
+        end = time.time()
+        tiempos.append(end-start)
+        
+    #Devuelve los porcentajes y los tiempos
+    return porcentajes, tiempos
 
 #Función que encuentra el amigo más cercano dentro de un conjunto al elemento
 #   del mismo con tiene índice i
@@ -118,10 +125,14 @@ def RELIEF(X,y):
     #Crear la división en 5 secciones
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     skf.get_n_splits(X,y)
-
+    
     porcentajes = []
+    reduccion = []
+    tiempos = []
     #Iterar sobre las 5 secciones distintas
     for i, j in skf.split(X,y):
+        start = time.time()
+        num_ceros = 0
         num_aciertos = 0
         
         #Separar los datos de entrenamiento y prueba en listas distintas
@@ -161,13 +172,22 @@ def RELIEF(X,y):
         clasificador = KNeighborsClassifier(n_neighbors=1)
         clasificador.fit(entrenamientox, entrenamientoy)
         
+        #Obtener tasa de aciertos, tasa de reducción y tiempo de ejecución
         for k in range(len(pruebax)):
             pred = clasificador.predict([pruebax[k]])
             if pruebay[k] == pred: num_aciertos += 1
         
         porcentajes.append(100 * num_aciertos / len(pruebax))
+        
+        for k in w:
+            if k < 0.2: num_ceros += 1
+            
+        reduccion.append(100*num_ceros/len(w))
+        
+        end = time.time()
+        tiempos.append(end-start)
     
-    return porcentajes
+    return porcentajes, reduccion, tiempos
 
 #KNN con k=1 y pesos aprendidos usando el método de búsqueda local best first
 def BL(X,y):
@@ -181,10 +201,15 @@ def BL(X,y):
     valor_max = -10000.0
     
     porcentajes = []
+    reduccion = []
+    tiempos = []
     
     #Iterar sobre las 5 secciones distintas
     for i, j in skf.split(X,y):
+        start = time.time()
+        
         num_aciertos = 0
+        num_ceros = 0
         
         #Separar los datos de entrenamiento y prueba en listas distintas
         entrenamientox = [X[k] for k in i]
@@ -205,7 +230,13 @@ def BL(X,y):
             for k in range(len(w)):
                 #Se modifica un valor del vector de pesos y se trunca -> nuevo vecino
                 w[k] += Z
-                if w[k] < 0.2: w[k] = 0.0
+                if w[k] < 0.2:
+                    num_ceros = 0
+                    for l in w:
+                        if l < 0.2: num_ceros += 1
+                        
+                    if num_ceros < (len(w)-1): w[k] = 0.0
+                    else: w[k] = 0.2
                 if w[k] > 1.0: w[k] = 1.0
             
                 num_vecinos += 1
@@ -217,7 +248,7 @@ def BL(X,y):
                 clasificador = KNeighborsClassifier(n_neighbors=1)
                 clasificador.fit(entrenamientox_aux, entrenamientoy)
                 
-                for k in range(len(pruebax)):
+                for k in range(len(pruebax_aux)):
                     pred = clasificador.predict([pruebax_aux[k]])
                     if pruebay[k] == pred: num_aciertos += 1
                 
@@ -251,14 +282,24 @@ def BL(X,y):
         clasificador = KNeighborsClassifier(n_neighbors=1)
         clasificador.fit(entrenamientox, entrenamientoy)
         
+        #Obtener tasa de aciertos, tasa de reducción y tiempo de ejecución
         num_aciertos = 0
+        num_ceros = 0
         for k in range(len(pruebax)):
             pred = clasificador.predict([pruebax[k]])
             if pruebay[k] == pred: num_aciertos += 1
         
         porcentajes.append(100 * num_aciertos / len(pruebax))
+        
+        for k in w:
+            if k < 0.2: num_ceros += 1
+        
+        reduccion.append(100 * num_ceros / len(w))
+        
+        end = time.time()
+        tiempos.append(end-start)
     
-    return porcentajes
+    return porcentajes, reduccion, tiempos
 
 #lectura de los ficheros de datos
 datos1, meta1 = arff.loadarff('datos/colposcopy.arff')
@@ -267,36 +308,60 @@ datos3, meta3 = arff.loadarff('datos/texture.arff')
 
 #colposcopy
 X, y = tratamientoDatos(datos1)
-porcentajes = KNN(X,y)
-print("Porcentaje 1NN: ", sum(porcentajes)/5.0)
+porcentajes, tiempos = KNN(X,y)
+print("Porcentaje medio 1NN: ", sum(porcentajes)/5.0)
+print("Tiempo medio de ejecución 1NN", sum(tiempos)/5.0)
+print(porcentajes, tiempos)
 
-porcentajes = RELIEF(X,y)
-print("Porcentaje RELIEF: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = RELIEF(X,y)
+print("Porcentaje medio RELIEF: ", sum(porcentajes)/5.0)
+print("Tasa de reducción media RELIEF: ", sum(reduccion)/5.0)
+print("Tiempo medio de ejecución RELIEF", sum(tiempos)/5.0)
+print(porcentajes, reduccion, tiempos)
 
-porcentajes = BL(X,y)
-print("Porcentaje Búsqueda Local: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = BL(X,y)
+print("Porcentaje medio Búsqueda Local: ", sum(porcentajes)/5.0)
+print("Tasa de reducción media BL: ", sum(reduccion)/5.0)
+print("Tiempo medio de ejecución BL", sum(tiempos)/5.0)
+print(porcentajes, reduccion, tiempos)
 
 #ionosphere
 X, y = tratamientoDatos(datos2)
-porcentajes = KNN(X,y)
-print("Porcentaje 1NN: ", sum(porcentajes)/5.0)
+porcentajes, tiempos = KNN(X,y)
+print("Porcentaje medio 1NN: ", sum(porcentajes)/5.0)
+print("Tiempo medio de ejecución 1NN", sum(tiempos)/5.0)
+print(porcentajes, tiempos)
 
-porcentajes = RELIEF(X,y)
-print("Porcentaje RELIEF: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = RELIEF(X,y)
+print("Porcentaje medio RELIEF: ", sum(porcentajes)/5.0)
+print("Tasa de reducción media RELIEF: ", sum(reduccion)/5.0)
+print("Tiempo medio de ejecución RELIEF", sum(tiempos)/5.0)
+print(porcentajes, reduccion, tiempos)
 
-porcentajes = BL(X,y)
-print("Porcentaje Búsqueda Local: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = BL(X,y)
+print("Porcentaje medio Búsqueda Local: ", sum(porcentajes)/5.0)
+print("Tasa de reducción media BL: ", sum(reduccion)/5.0)
+print("Tiempo medio de ejecución BL", sum(tiempos)/5.0)
+print(porcentajes, reduccion, tiempos)
 
 #texture
 X, y = tratamientoDatos(datos3)
-porcentajes = KNN(X,y) 
-print("Porcentaje 1NN: ", sum(porcentajes)/5.0)
+porcentajes, tiempos = KNN(X,y) 
+print("Porcentaje medio 1NN: ", sum(porcentajes)/5.0)
+print("Tiempo medio de ejecución 1NN", sum(tiempos)/5.0)
+print(porcentajes, tiempos)
 
-porcentajes = RELIEF(X,y)
-print("Porcentaje RELIEF: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = RELIEF(X,y)
+print("Porcentaje medio RELIEF: ", sum(porcentajes)/5.0)
+print("Tasa de reducción media RELIEF: ", sum(reduccion)/5.0)
+print("Tiempo medio de ejecución RELIEF", sum(tiempos)/5.0)
+print(porcentajes, reduccion, tiempos)
 
-porcentajes = BL(X,y)
-print("Porcentaje Búsqueda Local: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = BL(X,y)
+print("Porcentaje medio Búsqueda Local: ", sum(porcentajes)/5.0)
+print("Tasa de reducción media BL: ", sum(reduccion)/5.0)
+print("Tiempo medio de ejecución BL", sum(tiempos)/5.0)
+print(porcentajes, reduccion, tiempos)
 
 
 
