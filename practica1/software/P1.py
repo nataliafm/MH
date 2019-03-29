@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.model_selection import StratifiedKFold
 import time
 
-np.random.seed = 42
+np.random.seed(42)
 
 #Función que recibe los datos leídos de los ficheros y los divide en X e y,
 #   y normaliza los valores de X para que estén todos dentro del intervalo [0,1]
@@ -35,15 +35,14 @@ def tratamientoDatos(datos):
         
         for j in range(len(X[i])):
             X[i][j] = (X[i][j] - minimo) / (maximo - minimo)
-    
-    return X,y
-
-#KNN con k=1 y pesos uniformes
-def KNN(X, y):
-    #Crear la división en 5 secciones
+            
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     skf.get_n_splits(X,y)
+    
+    return X, y, skf
 
+#KNN con k=1 y pesos uniformes
+def KNN(X, y, skf):
     porcentajes = []
     tiempos = []
     #Iterar sobre las 5 secciones distintas
@@ -99,6 +98,8 @@ def encontrarAmigo(conjunto, i, valores):
         #si es el más cercano y son amigos, puede ser la solución
         if distancia < val_sol and val_aux[j] == valores[i]:
             sol = j
+            
+        val_sol = distancia
     
     return conjunto[sol]
 
@@ -117,15 +118,13 @@ def encontrarEnemigo(conjunto, i, valores):
         #si es el más cercano y son enemigos, puede ser la solución
         if distancia < val_sol and valores[j] != valores[i]:
             sol = j
+            
+        val_sol = distancia
     
     return conjunto[sol]
     
 #KNN con k=1 y pesos aprendidos usando el método greedy RELIEF
-def RELIEF(X,y):
-    #Crear la división en 5 secciones
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    skf.get_n_splits(X,y)
-    
+def RELIEF(X, y, skf):
     porcentajes = []
     reduccion = []
     tiempos = []
@@ -190,14 +189,10 @@ def RELIEF(X,y):
     return porcentajes, reduccion, tiempos
 
 #KNN con k=1 y pesos aprendidos usando el método de búsqueda local best first
-def BL(X,y):
+def BL(X, y, skf):
     #Inicializa el vector de pesos con valores aleatorios entre [0,1]
     w = np.random.rand(len(X[0]))
-    
-    #Crear la división en 5 secciones
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    skf.get_n_splits(X,y)
-    
+
     valor_max = -10000.0
     
     porcentajes = []
@@ -307,61 +302,88 @@ datos2, meta2 = arff.loadarff('datos/ionosphere.arff')
 datos3, meta3 = arff.loadarff('datos/texture.arff')
 
 #colposcopy
-X, y = tratamientoDatos(datos1)
-porcentajes, tiempos = KNN(X,y)
+X, y, skf = tratamientoDatos(datos1)
+porcentajes, tiempos = KNN(X, y, skf)
+print("Resultados para el dataset colposcopy:\n")
+print("Porcentajes 1NN: ", porcentajes)
 print("Porcentaje medio 1NN: ", sum(porcentajes)/5.0)
-print("Tiempo medio de ejecución 1NN", sum(tiempos)/5.0)
-print(porcentajes, tiempos)
+print("Tiempos de ejecución 1NN: ", tiempos)
+print("Tiempo medio de ejecución 1NN: ", sum(tiempos)/5.0)
+print("\n")
 
-porcentajes, reduccion, tiempos = RELIEF(X,y)
+porcentajes, reduccion, tiempos = RELIEF(X, y, skf)
+print("Porcentajes RELIEF: ", porcentajes)
 print("Porcentaje medio RELIEF: ", sum(porcentajes)/5.0)
+print("Tasas de reducción RELIEF: ", reduccion)
 print("Tasa de reducción media RELIEF: ", sum(reduccion)/5.0)
-print("Tiempo medio de ejecución RELIEF", sum(tiempos)/5.0)
-print(porcentajes, reduccion, tiempos)
+print("Tiempos de ejecución RELIEF: ", tiempos)
+print("Tiempo medio de ejecución RELIEF: ", sum(tiempos)/5.0)
+print("\n")
 
-porcentajes, reduccion, tiempos = BL(X,y)
-print("Porcentaje medio Búsqueda Local: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = BL(X, y, skf)
+print("Porcentajes BL: ", porcentajes)
+print("Porcentaje medio BL: ", sum(porcentajes)/5.0)
+print("Tasas de reducción BL: ", reduccion)
 print("Tasa de reducción media BL: ", sum(reduccion)/5.0)
-print("Tiempo medio de ejecución BL", sum(tiempos)/5.0)
-print(porcentajes, reduccion, tiempos)
+print("Tiempos de ejecución BL: ", tiempos)
+print("Tiempo medio de ejecución BL: ", sum(tiempos)/5.0)
+print("\n")
 
 #ionosphere
-X, y = tratamientoDatos(datos2)
-porcentajes, tiempos = KNN(X,y)
+X, y, skf = tratamientoDatos(datos2)
+porcentajes, tiempos = KNN(X, y, skf)
+print("Resultados para el dataset ionosphere:\n")
+print("Porcentajes 1NN: ", porcentajes)
 print("Porcentaje medio 1NN: ", sum(porcentajes)/5.0)
-print("Tiempo medio de ejecución 1NN", sum(tiempos)/5.0)
-print(porcentajes, tiempos)
+print("Tiempos de ejecución 1NN: ", tiempos)
+print("Tiempo medio de ejecución 1NN: ", sum(tiempos)/5.0)
+print("\n")
 
-porcentajes, reduccion, tiempos = RELIEF(X,y)
+porcentajes, reduccion, tiempos = RELIEF(X, y, skf)
+print("Porcentajes RELIEF: ", porcentajes)
 print("Porcentaje medio RELIEF: ", sum(porcentajes)/5.0)
+print("Tasas de reducción RELIEF: ", reduccion)
 print("Tasa de reducción media RELIEF: ", sum(reduccion)/5.0)
-print("Tiempo medio de ejecución RELIEF", sum(tiempos)/5.0)
-print(porcentajes, reduccion, tiempos)
+print("Tiempos de ejecución RELIEF: ", tiempos)
+print("Tiempo medio de ejecución RELIEF: ", sum(tiempos)/5.0)
+print("\n")
 
-porcentajes, reduccion, tiempos = BL(X,y)
-print("Porcentaje medio Búsqueda Local: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = BL(X, y, skf)
+print("Porcentajes BL: ", porcentajes)
+print("Porcentaje medio BL: ", sum(porcentajes)/5.0)
+print("Tasas de reducción BL: ", reduccion)
 print("Tasa de reducción media BL: ", sum(reduccion)/5.0)
-print("Tiempo medio de ejecución BL", sum(tiempos)/5.0)
-print(porcentajes, reduccion, tiempos)
+print("Tiempos de ejecución BL: ", tiempos)
+print("Tiempo medio de ejecución BL: ", sum(tiempos)/5.0)
+print("\n")
 
 #texture
-X, y = tratamientoDatos(datos3)
-porcentajes, tiempos = KNN(X,y) 
+X, y, skf = tratamientoDatos(datos3)
+porcentajes, tiempos = KNN(X, y, skf) 
+print("Resultados para el dataset texture:\n")
+print("Porcentajes 1NN: ", porcentajes)
 print("Porcentaje medio 1NN: ", sum(porcentajes)/5.0)
-print("Tiempo medio de ejecución 1NN", sum(tiempos)/5.0)
-print(porcentajes, tiempos)
+print("Tiempos de ejecución 1NN: ", tiempos)
+print("Tiempo medio de ejecución 1NN: ", sum(tiempos)/5.0)
+print("\n")
 
-porcentajes, reduccion, tiempos = RELIEF(X,y)
+porcentajes, reduccion, tiempos = RELIEF(X, y, skf)
+print("Porcentajes RELIEF: ", porcentajes)
 print("Porcentaje medio RELIEF: ", sum(porcentajes)/5.0)
+print("Tasas de reducción RELIEF: ", reduccion)
 print("Tasa de reducción media RELIEF: ", sum(reduccion)/5.0)
-print("Tiempo medio de ejecución RELIEF", sum(tiempos)/5.0)
-print(porcentajes, reduccion, tiempos)
+print("Tiempos de ejecución RELIEF: ", tiempos)
+print("Tiempo medio de ejecución RELIEF: ", sum(tiempos)/5.0)
+print("\n")
 
-porcentajes, reduccion, tiempos = BL(X,y)
-print("Porcentaje medio Búsqueda Local: ", sum(porcentajes)/5.0)
+porcentajes, reduccion, tiempos = BL(X, y, skf)
+print("Porcentajes BL: ", porcentajes)
+print("Porcentaje medio BL: ", sum(porcentajes)/5.0)
+print("Tasas de reducción BL: ", reduccion)
 print("Tasa de reducción media BL: ", sum(reduccion)/5.0)
-print("Tiempo medio de ejecución BL", sum(tiempos)/5.0)
-print(porcentajes, reduccion, tiempos)
+print("Tiempos de ejecución BL: ", tiempos)
+print("Tiempo medio de ejecución BL: ", sum(tiempos)/5.0)
+print("\n")
 
 
 
