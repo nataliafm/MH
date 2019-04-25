@@ -345,12 +345,19 @@ def Cruce_BLX(alfa, cromosoma1, cromosoma2):
         I = Cmax - Cmin
         
         hijo.append(np.random.uniform(Cmin-I*alfa, Cmax+I*alfa))
-        
+    
+    return hijo
 
-def AGG(X, y, skf):
+def Cruce_aritmetico(cromosoma1, cromosoma2):
+    hijo = []
+    for i in range(len(cromosoma1)):
+        hijo.append((cromosoma1[i] + cromosoma2[i])/2.0)
+    
+    return hijo
+
+def AGG(X, y, skf, tipo):
     porcentajes = []
     reduccion = []
-    tiempos = []
     
     tam_poblacion = 30
     prob_cruce = 0.7
@@ -420,18 +427,83 @@ def AGG(X, y, skf):
                     copia_poblacion.append(dos)
             
             #Cálculo del número de padres que se cruzan
-            num_cruzan =  int(prob_cruce * tam_poblacion)
+            num_cruzan = int(prob_cruce * tam_poblacion)
             
             #Cruces
+            poblacion_sin_padres_cruzan = copia_poblacion[num_cruzan:]
             poblacion_cruzada = []
             for k in range(num_cruzan):
-                poblacion_cruzada.insert(Cruce_BLX(0.3, copia_poblacion[k], copia_poblacion[k+1]))
+                if tipo == 0:
+                    poblacion_cruzada.append(Cruce_BLX(0.3, copia_poblacion[k], copia_poblacion[k+1]))
+                else:
+                    poblacion_cruzada.append(Cruce_aritmetico(copia_poblacion[k], copia_poblacion[k+1]))
                 k += 1
                 
+            poblacion_cruzada += poblacion_sin_padres_cruzan
             
+            #Cálculo del número de miembros de la población que mutan
+            num_mutan = int(prob_mutacion * tam_poblacion * len(poblacion[0]))
             
+            #Mutaciones
+            poblacion_mutada = poblacion_cruzada
+            for k in range(num_mutan):
+                cromosoma = np.random.randint(0, tam_poblacion)
+                gen = np.random.randint(0, len(poblacion_mutada[0]))
+                
+                Z = np.random.normal(0.0, 0.3, 1)
+                poblacion_mutada[cromosoma][gen] += Z
+                
+            #Obtener mejor miembro de la población anterior
+            mejor = poblacion[valores.index(max(valores))]
+            
+            #Sustituir la población anterior por la nueva y añadir el mejor
+            #   valor de la población anterior al final
+            poblacion = poblacion_mutada
+            poblacion.append(mejor)
+            
+            #Evaluar la nueva población
+            valores = []
+            for k in range(tam_poblacion):
+                #Evaluar el cromosoma
+                entrenamientox_aux = entrenamientox * w
+                pruebax_aux = pruebax * w
+                        
+                clasificador = KNeighborsClassifier(n_neighbors=1)
+                clasificador.fit(entrenamientox_aux, entrenamientoy)
+                
+                pred = clasificador.predict(pruebax_aux)
+                    
+                num_aciertos = 0
+                tasa_cas = 0.0
+                nulos = 0
+                tasa_red = 0.0
+                    
+                num_aciertos = len([b for a, b in enumerate(pruebay) if b == pred[a]])
+                tasa_cas = 100 * num_aciertos / len(pruebax_aux)
+    
+                nulos = len([a for a in w if a <= 0.2]) 
+                tasa_red = 100 * nulos / len(w)
+                    
+                #Evaluación de la función objetivo
+                valor = 0.5 * tasa_cas + 0.5 * tasa_red
+                num_evaluaciones += 1
+                
+                valores.append(valor)
+            
+        #Obtener el mejor valor de la población obtenida
+        w = poblacion[valores.index(max(valores))]
         
+        #Evaluar el vector de pesos obtenido
+        num_aciertos = len([b for a, b in enumerate(pruebay) if b == pred[a]])
+        tasa_cas = 100 * num_aciertos / len(pruebax_aux)
+    
+        nulos = len([a for a in w if a <= 0.2]) 
+        tasa_red = 100 * nulos / len(w)
         
+        porcentajes.append(tasa_cas)
+        reduccion.append(tasa_red)
+        
+    return porcentajes, reduccion
 
 #lectura de los ficheros de datos
 datos1, meta1 = arff.loadarff('datos/colposcopy.arff')
@@ -440,10 +512,31 @@ datos3, meta3 = arff.loadarff('datos/texture.arff')
 
 #colposcopy
 X, y, skf = tratamientoDatos(datos1)
+porcentajes, reduccion = AGG(X, y, skf, 0)
+print("Porcentajes AGG con BLX: ", porcentajes)
+print("Reducción AGG con BLX: ", reduccion)
 
+porcentajes, reduccion = AGG(X, y, skf, 1)
+print("Porcentajes AGG con AC: ", porcentajes)
+print("Reducción AGG con AC: ", reduccion)
+print('\n')
 #ionosphere
 X, y, skf = tratamientoDatos(datos2)
+porcentajes, reduccion = AGG(X, y, skf, 0)
+print("Porcentajes AGG con BLX: ", porcentajes)
+print("Reducción AGG con BLX: ", reduccion)
 
+porcentajes, reduccion = AGG(X, y, skf, 1)
+print("Porcentajes AGG con AC: ", porcentajes)
+print("Reducción AGG con AC: ", reduccion)
+print('\n')
 #texture
 X, y, skf = tratamientoDatos(datos3)
+porcentajes, reduccion = AGG(X, y, skf, 0)
+print("Porcentajes AGG con BLX: ", porcentajes)
+print("Reducción AGG con BLX: ", reduccion)
 
+porcentajes, reduccion = AGG(X, y, skf, 1)
+print("Porcentajes AGG con AC: ", porcentajes)
+print("Reducción AGG con AC: ", reduccion)
+print('\n')
