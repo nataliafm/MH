@@ -35,7 +35,8 @@ def tratamientoDatos(datos):
         
         for j in range(len(X[i])):
             X[i][j] = (X[i][j] - minimo) / (maximo - minimo)
-            
+    
+    #Crear las particiones
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     skf.get_n_splits(X,y)
     
@@ -189,11 +190,10 @@ def RELIEF(X, y, skf):
     return porcentajes, reduccion, tiempos
 
 #KNN con k=1 y pesos aprendidos usando el método de búsqueda local best first
+
 def BL(X, y, skf):
     #Inicializa el vector de pesos con valores aleatorios entre [0,1]
     w = np.random.rand(len(X[0]))
-
-    valor_max = -10000.0
     
     porcentajes = []
     reduccion = []
@@ -202,6 +202,8 @@ def BL(X, y, skf):
     #Iterar sobre las 5 secciones distintas
     for i, j in skf.split(X,y):
         start = time.time()
+        
+        w = np.random.rand(len(X[0]))
         
         num_aciertos = 0
         num_ceros = 0
@@ -213,28 +215,53 @@ def BL(X, y, skf):
         pruebax = [X[k] for k in j]
         pruebay = [y[k] for k in j]
         
+        #Obtener valor del punto de partida
+        entrenamientox_aux = entrenamientox * w
+        pruebax_aux = pruebax * w
+                
+        clasificador = KNeighborsClassifier(n_neighbors=1)
+        clasificador.fit(entrenamientox_aux, entrenamientoy)
+
+        pred = clasificador.predict(pruebax_aux)
+        num_aciertos = len([b for a, b in enumerate(pruebay) if b == pred[a]])
+                
+        tasa_cas = 100 * num_aciertos / len(pruebax_aux)
+                
+        nulos = 0
+        nulos = len([a for a in w if a <= 0.2]) 
+                    
+        tasa_red = 100 * nulos / len(w)
+                
+        #Evaluación de la función objetivo
+        valor_max = 0.5 * tasa_cas + 0.5 * tasa_red
+        
         num_vecinos = 0
         iteraciones = 0
         
         #Exploración del vecindario
-        while num_vecinos < 20 * len(w) and iteraciones < 15000:
-            #Generación de un valor de la distribución normal
-            Z = np.random.normal(0.0, 0.3, None)
+        while iteraciones < 30000:
+            num_vecinos = 0
             w_original = w #se guarda el valor original del vector en caso de que tenga que volver atrás
+
             
-            for k in range(len(w)):
-                #Se modifica un valor del vector de pesos y se trunca -> nuevo vecino
+            while num_vecinos < 20 * len(w):
+                #Generación de un valor de la distribución normal
+                Z = np.random.normal(0.0, 0.3, 1)
+                
+                #Elección aleatoria de un índice del vector de pesos
+                k = np.random.choice(range(len(w)))
+                
+                #Se obtiene un vecino modificando el vector pesos y sumándole
+                #   a uno de sus elementos un valor de la distribución normal
+                valor_anterior = w[k]
+                
                 w[k] += Z
-                if w[k] < 0.2:
-                    num_ceros = 0
-                    for l in w:
-                        if l < 0.2: num_ceros += 1
-                        
-                    if num_ceros < (len(w)-1): w[k] = 0.0
-                    else: w[k] = 0.2
+                if w[k] < 0.0: w[k] = 0.0
                 if w[k] > 1.0: w[k] = 1.0
-            
-                num_vecinos += 1
+                
+                #Si ha hecho 100% de reducción, deshace la modificación
+                num_ceros = len(w) - np.count_nonzero(w)
+                if num_ceros == len(w): w[k] = valor_anterior
                 
                 #Se comprueba si el nuevo vecino es mejor que el que ya tenemos
                 entrenamientox_aux = entrenamientox * w
@@ -243,30 +270,38 @@ def BL(X, y, skf):
                 clasificador = KNeighborsClassifier(n_neighbors=1)
                 clasificador.fit(entrenamientox_aux, entrenamientoy)
                 
-                for k in range(len(pruebax_aux)):
-                    pred = clasificador.predict([pruebax_aux[k]])
-                    if pruebay[k] == pred: num_aciertos += 1
+                pred = clasificador.predict(pruebax_aux)
                 
-                tasa_cas = 100 * num_aciertos / len(pruebax_aux)
-                
+                num_aciertos = 0
+                tasa_cas = 0.0
                 nulos = 0
-                for k in w:
-                    if k == 0.0: nulos += 1
+                tasa_red = 0.0
+                
+                num_aciertos = len([b for a, b in enumerate(pruebay) if b == pred[a]])
+
+                tasa_cas = 100 * num_aciertos / len(pruebax_aux)
+
+                nulos = len([a for a in w if a <= 0.2]) 
                     
                 tasa_red = 100 * nulos / len(w)
                 
                 #Evaluación de la función objetivo
                 valor = 0.5 * tasa_cas + 0.5 * tasa_red
+                iteraciones += 1
                 
+                num_aciertos = 0
+                nulos = 0
                 #Si el valor para la función objetivo es mejor que el que tenemos,
                 #   nos movemos a ese valor y ya no buscamos más vecinos
                 if valor > valor_max:
                     valor_max = valor
-                    iteraciones = 0
                     break
                 else: #Si el valor es peor, seguimos explorando el vecindario
                     w = w_original
-                    iteraciones += 1
+                    num_vecinos += 1
+                if iteraciones >= 15000: break
+            
+            if num_vecinos >= 20 * len(w): break
         
         #Multiplicar los inputs por los pesos obtenidos
         entrenamientox *= w
@@ -293,6 +328,7 @@ def BL(X, y, skf):
         
         end = time.time()
         tiempos.append(end-start)
+        print("WIGGG")
     
     return porcentajes, reduccion, tiempos
 
@@ -384,8 +420,5 @@ print("Tasa de reducción media BL: ", sum(reduccion)/5.0)
 print("Tiempos de ejecución BL: ", tiempos)
 print("Tiempo medio de ejecución BL: ", sum(tiempos)/5.0)
 print("\n")
-
-
-
 
 
