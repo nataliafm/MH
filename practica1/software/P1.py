@@ -328,7 +328,6 @@ def BL(X, y, skf):
         
         end = time.time()
         tiempos.append(end-start)
-        print("WIGGG")
     
     return porcentajes, reduccion, tiempos
 
