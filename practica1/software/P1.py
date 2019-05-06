@@ -190,7 +190,6 @@ def RELIEF(X, y, skf):
     return porcentajes, reduccion, tiempos
 
 #KNN con k=1 y pesos aprendidos usando el método de búsqueda local best first
-
 def BL(X, y, skf):
     #Inicializa el vector de pesos con valores aleatorios entre [0,1]
     w = np.random.rand(len(X[0]))
@@ -216,16 +215,25 @@ def BL(X, y, skf):
         pruebay = [y[k] for k in j]
         
         #Obtener valor del punto de partida
-        entrenamientox_aux = entrenamientox * w
-        pruebax_aux = pruebax * w
+        num_train = int(0.8 * len(entrenamientox))
+        
+        trainx = entrenamientox[:num_train]
+        trainy = entrenamientoy[:num_train]
+        
+        testx = entrenamientox[num_train:]
+        testy = entrenamientoy[num_train:]
+        
+        trainx *= w
+        
+        #entrenamientox_aux = entrenamientox * w
                 
         clasificador = KNeighborsClassifier(n_neighbors=1)
-        clasificador.fit(entrenamientox_aux, entrenamientoy)
+        clasificador.fit(trainx, trainy)
 
-        pred = clasificador.predict(pruebax_aux)
-        num_aciertos = len([b for a, b in enumerate(pruebay) if b == pred[a]])
+        pred = clasificador.predict(testx)
+        num_aciertos = len([b for a, b in enumerate(testy) if b == pred[a]])
                 
-        tasa_cas = 100 * num_aciertos / len(pruebax_aux)
+        tasa_cas = 100 * num_aciertos / len(testx)
                 
         nulos = 0
         nulos = len([a for a in w if a <= 0.2]) 
@@ -264,22 +272,29 @@ def BL(X, y, skf):
                 if num_ceros == len(w): w[k] = valor_anterior
                 
                 #Se comprueba si el nuevo vecino es mejor que el que ya tenemos
-                entrenamientox_aux = entrenamientox * w
-                pruebax_aux = pruebax * w
+                num_train = int(0.8 * len(entrenamientox))
+        
+                trainx = entrenamientox[:num_train]
+                trainy = entrenamientoy[:num_train]
+                
+                testx = entrenamientox[num_train:]
+                testy = entrenamientoy[num_train:]
+                #entrenamientox_aux = entrenamientox * w
+                trainx *= w
                 
                 clasificador = KNeighborsClassifier(n_neighbors=1)
-                clasificador.fit(entrenamientox_aux, entrenamientoy)
+                clasificador.fit(trainx, trainy)
                 
-                pred = clasificador.predict(pruebax_aux)
+                pred = clasificador.predict(testx)
                 
                 num_aciertos = 0
                 tasa_cas = 0.0
                 nulos = 0
                 tasa_red = 0.0
                 
-                num_aciertos = len([b for a, b in enumerate(pruebay) if b == pred[a]])
+                num_aciertos = len([b for a, b in enumerate(testy) if b == pred[a]])
 
-                tasa_cas = 100 * num_aciertos / len(pruebax_aux)
+                tasa_cas = 100 * num_aciertos / len(trainx)
 
                 nulos = len([a for a in w if a <= 0.2]) 
                     
